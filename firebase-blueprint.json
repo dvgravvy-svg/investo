@@ -1,0 +1,73 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and progress data",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "level": { "type": "string", "enum": ["beginner", "proficient", "expert"] },
+        "streak": { "type": "number" },
+        "streakStartDate": { "type": "string", "format": "date-time" },
+        "lastSignIn": { "type": "string", "format": "date-time" },
+        "balance": { "type": "number" },
+        "xp": { "type": "number" },
+        "completedLessons": { "type": "array", "items": { "type": "string" } },
+        "lastRewardClaimedAt": { "type": "string", "format": "date-time" },
+        "petType": { "type": "string", "enum": ["bull", "bear"] },
+        "botType": { "type": "string", "enum": ["bull", "bear"] },
+        "unlockedGames": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["uid", "displayName", "email", "balance", "xp", "streak", "lastSignIn"]
+    },
+    "Trade": {
+      "title": "Trade",
+      "description": "Investing simulator trade record",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "symbol": { "type": "string" },
+        "type": { "type": "string", "enum": ["buy", "sell"] },
+        "entryPrice": { "type": "number" },
+        "exitPrice": { "type": "number" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["open", "closed"] },
+        "takeProfit": { "type": "number" },
+        "stopLoss": { "type": "number" },
+        "timestamp": { "type": "object" },
+        "profit": { "type": "number" },
+        "exitTime": { "type": "object" }
+      },
+      "required": ["uid", "symbol", "type", "entryPrice", "amount", "status", "timestamp"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Tutor chat message",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "ai"] },
+        "text": { "type": "string" },
+        "timestamp": { "type": "object" }
+      },
+      "required": ["uid", "role", "text", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Top-level user profiles"
+    },
+    "/users/{userId}/trades/{tradeId}": {
+      "schema": "Trade",
+      "description": "Trades associated with a user"
+    },
+    "/users/{userId}/chat/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Chat history with the AI tutor"
+    }
+  }
+}

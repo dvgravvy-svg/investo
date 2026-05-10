@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net (Pillar 0)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers (Pillar 3) ---
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isOwner(userId) { return isVerified() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // --- User Validation (Pillar 2, 5, 9) ---
+    function isValidUser(data) {
+      return data.uid == request.auth.uid
+        && data.displayName is string && data.displayName.size() <= 100
+        && data.email is string && data.email.size() <= 256
+        && data.balance is number
+        && data.xp is number
+        && data.streak is number
+        && data.lastSignIn is string
+        && (!('level' in data) || data.level in ['beginner', 'proficient', 'expert'])
+        && (!('petType' in data) || data.petType in ['bull', 'bear'])
+        && (!('botType' in data) || data.botType in ['bull', 'bear'])
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 1000))
+        && (!('completedLessons' in data) || (data.completedLessons is list && data.completedLessons.size() <= 500))
+        && (!('unlockedGames' in data) || (data.unlockedGames is list && data.unlockedGames.size() <= 100))
+        && (!('streakStartDate' in data) || (data.streakStartDate is string && data.streakStartDate.size() <= 100))
+        && (!('lastRewardClaimedAt' in data) || (data.lastRewardClaimedAt is string && data.lastRewardClaimedAt.size() <= 100));
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId); // Pillar 6
+      
+      allow create: if isOwner(userId) 
+        && isValidId(userId)
+        && isValidUser(incoming()) 
+        && incoming().keys().hasAll(['uid', 'displayName', 'email', 'balance', 'xp', 'streak', 'lastSignIn'])
+        && incoming().balance == 100000 // Initial balance enforcement (Pillar 8)
+        && incoming().xp == 0;
+      
+      allow update: if isOwner(userId) && isValidUser(incoming())
+        && incoming().uid == existing().uid // Immutable UID (Pillar 9)
+        && incoming().email == existing().email // Immutable Email
+        && (
+          // Action: Login / Profile Sync (from useAuth)
+          (incoming().diff(existing()).affectedKeys().hasOnly(['lastSignIn', 'streak', 'streakStartDate', 'displayName', 'photoURL', 'email', 'level', 'petType', 'botType', 'balance', 'xp', 'completedLessons', 'unlockedGames'])) ||
+          // Action: Daily Reward / Streak
+          (incoming().diff(existing()).affectedKeys().hasOnly(['xp', 'lastRewardClaimedAt', 'streak'])) ||
+          // Action: Lesson Progression
+          (incoming().diff(existing()).affectedKeys().hasOnly(['completedLessons', 'xp'])) ||
+          // Action: Simulator Transactions
+          (incoming().diff(existing()).affectedKeys().hasOnly(['balance'])) ||
+          // Action: Profile Customization
+          (incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'petType', 'botType', 'level'])) ||
+          // Action: Activity Update
+          (incoming().diff(existing()).affectedKeys().hasOnly(['lastSignIn', 'streakStartDate']))
+        );
+        
+      match /trades/{tradeId} {
+        function isValidTrade(data) {
+          return data.keys().hasAll(['uid', 'symbol', 'type', 'entryPrice', 'amount', 'status', 'timestamp'])
+            && data.uid == request.auth.uid
+            && data.symbol is string && data.symbol.size() <= 20
+            && data.type in ['buy', 'sell']
+            && data.entryPrice is number
+            && data.amount is number && data.amount > 0
+            && data.status in ['open', 'closed']
+            && (!('takeProfit' in data) || data.takeProfit == null || data.takeProfit is number)
+            && (!('stopLoss' in data) || data.stopLoss == null || data.stopLoss is number)
+            && (!('profit' in data) || data.profit is number)
+            && (!('exitPrice' in data) || data.exitPrice is number)
+            && (!('exitTime' in data) || (data.exitTime is timestamp || data.exitTime is string));
+        }
+
+        // Pillar 8: Force security on list queries
+        allow list: if isOwner(userId) && resource.data.uid == request.auth.uid;
+        allow get: if isOwner(userId);
+        
+        allow create: if isOwner(userId) && isValidId(tradeId) && isValidTrade(incoming()) && incoming().status == 'open';
+        
+        allow update: if isOwner(userId) && isValidTrade(incoming())
+          && incoming().uid == existing().uid // Immutable owner
+          && incoming().symbol == existing().symbol // Immutable symbol
+          && (
+            // Action: Close Trade (Status change) - Pillar 3
+            (existing().status == 'open' && incoming().status == 'closed' && 
+             incoming().diff(existing()).affectedKeys().hasOnly(['status', 'exitPrice', 'profit', 'exitTime'])) ||
+            // Action: Adjust TP/SL
+            (existing().status == 'open' && incoming().status == 'open' && 
+             incoming().diff(existing()).affectedKeys().hasOnly(['takeProfit', 'stopLoss']))
+          );
+        
+        allow delete: if isOwner(userId);
+      }
+
+      match /chat/{messageId} {
+        function isValidMessage(data) {
+          return data.keys().hasAll(['uid', 'role', 'text', 'timestamp'])
+            && data.uid == request.auth.uid
+            && data.role in ['user', 'ai']
+            && data.text is string && data.text.size() <= 5000;
+        }
+
+        allow list: if isOwner(userId) && resource.data.uid == request.auth.uid;
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(messageId) && isValidMessage(incoming());
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
