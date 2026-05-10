@@ -2,7 +2,7 @@ Idea: An investing app that teaches you how to trade and invest starting from th
 Problem: Many people feel overwhelmed and don’t know how to start trading. They also feel very demotivated when they are unable to learn effectively and just give up on trading easily
 Name: INVESTO
 Key functions:
-1. A duolingo style (gamified) learning platform 
+1. A Duolingo style (gamified) learning platform 
 - Removes the tedious work of having to search up articles and YouTube videos to learn how to trade
 - Makes the learning experience more fun and interactive, ensuring the user doesn’t feel bored and unable to learn effectively
 
