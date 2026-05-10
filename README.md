@@ -1,7 +1,9 @@
 Idea: An investing app that teaches you how to trade and invest starting from the fundamentals to more advanced skills in trading.
 
 Problem: Many people feel overwhelmed and don’t know how to start trading. They also feel very demotivated when they are unable to learn effectively and just give up on trading easily
+
 Name: INVESTO
+
 Key functions:
 1. Guided lessons
 - Starts with basics.
